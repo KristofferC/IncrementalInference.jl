@@ -561,7 +561,8 @@ function addFactor!(fgl::FactorGraph,
       labels::Vector{T}=String[],
       uid::Int=-1,
       autoinit::Bool=true,
-      threadmodel=MultiThreaded  ) where
+      threadmodel=MultiThreaded,
+      specialSampling::Bool=false  ) where
         {R <: Union{FunctorInferenceType, InferenceType},
          T <: AbstractString}
   #

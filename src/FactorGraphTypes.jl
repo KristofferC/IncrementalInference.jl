@@ -229,6 +229,7 @@ mutable struct CommonConvWrapper{T} <: ConvolutionObject where {T<:FunctorInfere
   # special case settings
   specialzDim::Bool # is there a special zDim requirement -- defined by user
   partial::Bool # is this a partial constraint -- defined by user
+  specialSampling::Bool
   # multi hypothesis settings
   hypotheses::Union{Void, Distributions.Categorical} # categorical to select which hypothesis is being considered during convolugtion operation
   certainhypo::Union{Void, Vector{Int}}
@@ -272,7 +273,8 @@ function CommonConvWrapper(fnc::T,
                            Y=zeros(size(X,1)),
                            xDim=size(X,1),
                            res=zeros(zDim),
-                           threadmodel=MultiThreaded  ) where {T<:FunctorInferenceType}
+                           threadmodel=MultiThreaded,
+                           specialSampling::Bool=false  ) where {T<:FunctorInferenceType}
   #
   ccw = CommonConvWrapper{T}()
 
@@ -287,6 +289,7 @@ function CommonConvWrapper(fnc::T,
   ccw.varidx = varidx
   ccw.threadmodel = threadmodel
   ccw.measurement = measurement
+  ccw.specialSampling = specialSampling
 
   # thread specific elements
   ccw.cpt = Vector{ConvPerThread}(Threads.nthreads())
@@ -314,18 +317,20 @@ mutable struct GenericFunctionNodeData{T, S}
   multihypo::String # likely to moved when GenericWrapParam is refactored
   GenericFunctionNodeData{T, S}() where {T, S} = new{T,S}()
   GenericFunctionNodeData{T, S}(x1, x2, x3, x4, x5::S, x6::T, x7::String="") where {T, S} = new{T,S}(x1, x2, x3, x4, x5, x6, x7)
-  GenericFunctionNodeData(x1, x2, x3, x4, x5::S, x6::T, x7::String="") where {T, S} = new{T,S}(x1, x2, x3, x4, x5, x6, x7)
+  # GenericFunctionNodeData(x1, x2, x3, x4, x5::S, x6::T, x7::String="") where {T, S} = new{T,S}(x1, x2, x3, x4, x5, x6, x7)
   # GenericFunctionNodeData(x1, x2, x3, x4, x5::S, x6::T, x7::String) where {T, S} = new{T,S}(x1, x2, x3, x4, x5, x6, x7)
 end
+GenericFunctionNodeData(x1, x2, x3, x4, x5::S, x6::T, x7::String="" ) where {T, S} = GenericFunctionNodeData{T,S}(x1, x2, x3, x4, x5, x6, x7)
 
 
 # where {T <: Union{InferenceType, FunctorInferenceType}}
 const FunctionNodeData{T} = GenericFunctionNodeData{T, Symbol}
-FunctionNodeData(x1, x2, x3, x4, x5::Symbol, x6::T, x7::String="") where {T <: Union{FunctorInferenceType, ConvolutionObject}}= GenericFunctionNodeData{T, Symbol}(x1, x2, x3, x4, x5, x6, x7)
+FunctionNodeData(x1, x2, x3, x4, x5::Symbol, x6::T, x7::String="", x8::Bool=false) where {T <: Union{FunctorInferenceType, ConvolutionObject}}= GenericFunctionNodeData{T, Symbol}(x1, x2, x3, x4, x5, x6, x7, x8)
+
 
 # where {T <: PackedInferenceType}
 const PackedFunctionNodeData{T} = GenericFunctionNodeData{T, <: AbstractString}
-PackedFunctionNodeData(x1, x2, x3, x4, x5::S, x6::T, x7::String="") where {T <: PackedInferenceType, S <: AbstractString} = GenericFunctionNodeData(x1, x2, x3, x4, x5, x6, x7)
+PackedFunctionNodeData(x1, x2, x3, x4, x5::S, x6::T, x7::String="", x8::Bool=false) where {T <: PackedInferenceType, S <: AbstractString} = GenericFunctionNodeData(x1, x2, x3, x4, x5, x6, x7, x8)
 
 
 ###
