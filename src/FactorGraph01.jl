@@ -369,27 +369,32 @@ function prepgenericconvolution(
   ARR = Array{Array{Float64,2},1}()
   maxlen, sfidx = prepareparamsarray!(ARR, Xi, 0, 0)
   fldnms = fieldnames(usrfnc)
-  zdim = typeof(usrfnc) != GenericMarginal ? size(getSample(usrfnc, 2)[1],1) : 0
+  usda = FactorMetadata()
+  usda.variableuserdata = []
+  usda.solvefor = :null
+  for xi in Xi
+    push!(usda.variableuserdata, getData(xi).softtype)
+  end
+  # TODO -- calculate zDim internal to CCW constructors, as required by specialSampling
+  zdim = 0
+  if typeof(usrfnc) != GenericMarginal
+    zDim = size(getSample(usrfnc, 2)[1],1)
+  elseif usrfnc
+    zDim = size(getSample(usrfnc, usda, 2)[1],1)
+  end
   certainhypo = multihypo != nothing ? collect(1:length(multihypo.p))[multihypo.p .== 0.0] : collect(1:length(Xi))
   ccw = CommonConvWrapper(
           usrfnc,
           zeros(1,0),
           zdim,
           ARR,
-          specialzDim = sum(fldnms .== :zDim) >= 1,
-          partial = sum(fldnms .== :partial) >= 1,
+          specialzDim = :zDim in fldnms,
+          partial = :partial in fldnms,
           hypotheses=multihypo,
           certainhypo=certainhypo,
-          threadmodel=threadmodel
+          threadmodel=threadmodel,
+          factormetadata=usda
         )
-  #
-  for i in 1:Threads.nthreads()
-    ccw.cpt[i].factormetadata.variableuserdata = []
-    ccw.cpt[i].factormetadata.solvefor = :null
-    for xi in Xi
-      push!(ccw.cpt[i].factormetadata.variableuserdata, getData(xi).softtype)
-    end
-  end
   return ccw
 end
 
@@ -616,7 +621,8 @@ function addFactor!(
       labels::Vector{T}=String[],
       uid::Int=-1,
       autoinit::Bool=true,
-      threadmodel=MultiThreaded  ) where
+      threadmodel=MultiThreaded,
+      specialSampling::Bool=false  ) where
         {R <: Union{FunctorInferenceType, InferenceType},
          T <: AbstractString}
   #
@@ -624,7 +630,7 @@ function addFactor!(
   for xi in xisyms
       push!( verts, api.getvertex(fgl,xi) )
   end
-  addFactor!(fgl, verts, usrfnc, multihypo=multihypo, ready=ready, api=api, labels=labels, uid=uid, autoinit=autoinit, threadmodel=threadmodel )
+  addFactor!(fgl, verts, usrfnc, multihypo=multihypo, ready=ready, api=api, labels=labels, uid=uid, autoinit=autoinit, threadmodel=threadmodel, specialSampling=specialSampling )
 end
 
 

@@ -5,7 +5,11 @@ end
 
 
 function freshSamples!(ccwl::CommonConvWrapper, N::Int=1)
-  ccwl.measurement = getSample(ccwl.usrfnc!, N)
+  if ccwl.specialSampling
+    ccwl.measurement = getSample(ccwl.usrfnc!, ccwl.cpt[Threads.threadid()].factormetadata, N)
+  else
+    ccwl.measurement = getSample(ccwl.usrfnc!, N)
+  end
   nothing
 end
 
@@ -100,6 +104,7 @@ function numericRootGenericRandomizedFnc!(
     #shuffleXAltD!( ccwl, r.zero ) # moved up
   elseif ccwl.zDim >= ccwl.xDim && !ccwl.partial
     # equal or more measurement dimensions than variable dimensions -- i.e. don't shuffle
+    @show ccwl.xDim, ccwl.cpt[Threads.threadid()].perturb
     ccwl.cpt[Threads.threadid()].perturb[1:ccwl.xDim] = perturb*randn(ccwl.xDim)
     ccwl.cpt[Threads.threadid()].X[1:ccwl.xDim, ccwl.cpt[Threads.threadid()].particleidx] += ccwl.cpt[Threads.threadid()].perturb[1:ccwl.xDim] # moved up
 

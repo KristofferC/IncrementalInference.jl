@@ -83,7 +83,8 @@ function prepareCommonConvWrapper!(ccwl::CommonConvWrapper{T},
   maxlen, sfidx = prepareparamsarray!(ARR, Xi, N, solvefor)
   # should be selecting for the correct multihypothesis mode here with `gwp.params=ARR[??]`
   ccwl.params = ARR
-  ccwl.measurement = getSample(ccwl.usrfnc!, maxlen) # ccwl.samplerfnc
+  freshSamples!(ccwl, maxlen)
+  # ccwl.measurement = getSample(ccwl.usrfnc!, maxlen) # ccwl.samplerfnc
   if ccwl.specialzDim
     ccwl.zDim = ccwl.usrfnc!.zDim[sfidx]
   else
@@ -243,7 +244,8 @@ function evalPotentialSpecific(Xi::Vector{Graphs.ExVertex},
   fnc = ccwl.usrfnc!
 
   nn = (N <= 0 ? size(getVal(Xi[1]),2) : N)
-  ccwl.measurement = getSample(ccwl.usrfnc!, nn)
+  freshSamples!(ccwl, nn)
+  # ccwl.measurement = getSample(ccwl.usrfnc!, nn)
   if !ccwl.partial
     return ccwl.measurement[1]
   else
@@ -277,7 +279,8 @@ function evalPotentialSpecific(Xi::Vector{Graphs.ExVertex},
   var = Base.var(val,2) + 1e-3
 
   # determine amount share of null hypothesis particles
-  ccwl.measurement = getSample(ccwl.usrfnc!, N)
+  freshSamples!(ccwl, N)
+  # ccwl.measurement = getSample(ccwl.usrfnc!, N)
   # values of 0 imply null hypothesis
   # ccwl.usrfnc!.nullhypothesis::Distributions.Categorical
   nhc = rand(ccwl.usrfnc!.nullhypothesis, N) - 1
@@ -358,6 +361,7 @@ function approxConvBinary(arr::Array{Float64,2}, meas::T, outdims::Int; N::Int=0
   push!(t,arr)
   push!(t,pts)
 
+  :specialSampling in fieldnames(T) ? error("approxConvBinary does not support specialSampling yet.") : nothing
   measurement = getSample(meas, N)
 
   ccw = CommonConvWrapper(meas, t[2], size(measurement[1],2), t, varidx=2, measurement=measurement)
