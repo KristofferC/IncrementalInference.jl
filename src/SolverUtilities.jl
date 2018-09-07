@@ -1,4 +1,15 @@
 
+function fastnorm(u)
+  # dest[1] = ...
+  n = length(u)
+  T = eltype(u)
+  s = zero(T)
+  @fastmath @inbounds @simd for i in 1:n
+      s += u[i]^2
+  end
+  @fastmath @inbounds return sqrt(s)
+end
+
 function numericRoot(residFnc::Function, measurement, parameters, x0::Vector{Float64})
   return (nlsolve(   (res, X) -> residFnc(res, measurement, parameters, X), x0 )).zero
 end
@@ -168,7 +179,7 @@ function setfreeze!(fgl::FactorGraph, sym::Symbol)
   end
   vert = getVert(fgl, sym)
   data = getData(vert)
-  data.isfrozen = true
+  data.ismargin = true
 
   nothing
 end

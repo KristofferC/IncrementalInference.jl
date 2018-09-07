@@ -14,7 +14,7 @@ getVert(fgl::FactorGraph, id::Int; api::DataLayerAPI=dlapi) = api.getvertex(fgl,
 # see JuliaArchive/Graphs.jl#233
 getData(v::Graphs.ExVertex) = v.attributes["data"]
 # Convenience functions
-getData(fgl::FactorGraph, lbl::Symbol; api::DataLayerAPI=dlapi) = getData(getVert(fgl, lbl, api=api))
+getData(fgl::FactorGraph, lbl::Symbol; api::DataLayerAPI=dlapi, nt=:var) = getData(getVert(fgl, lbl, api=api, nt=nt))
 getData(fgl::FactorGraph, id::Int; api::DataLayerAPI=dlapi) = getData(getVert(fgl, id, api=api))
 
 function setData!(v::Graphs.ExVertex, data)
@@ -130,7 +130,9 @@ function setDefaultNodeData!(v::Graphs.ExVertex,
                              dodims::Int,
                              N::Int,
                              dims::Int;
-                             gt=nothing, initialized::Bool=true,
+                             gt=nothing,
+                             initialized::Bool=true,
+                             dontmargin::Bool=false,
                              softtype=nothing)
   # TODO review and refactor this function, exists as legacy from pre-v0.3.0
   # this should be the only function allocating memory for the node points (unless number of points are changed)
@@ -154,12 +156,12 @@ function setDefaultNodeData!(v::Graphs.ExVertex,
     pNpts = getPoints(pN)
     data = VariableNodeData(initval, stdev, pNpts,
                             gbw2, Int[], sp,
-                            dims, false, 0, Int[], gt, softtype, true, false) #initialized
+                            dims, false, 0, Int[], gt, softtype, true, false, dontmargin) #initialized
   else
       sp = round.(Int,linspace(dodims,dodims+dims-1,dims))
       data = VariableNodeData(initval, stdev, zeros(dims, N),
                               zeros(dims,1), Int[], sp,
-                              dims, false, 0, Int[], gt, softtype, false, false) #initialized
+                              dims, false, 0, Int[], gt, softtype, false, false, dontmargin) #initialized
   end
   #
   setData!(v, data)
@@ -209,6 +211,7 @@ function addNode!(fg::FactorGraph,
                   N::Int=100,
                   autoinit::Bool=true,  # does init need to be separate from ready? TODO
                   ready::Int=1,
+                  dontmargin::Bool=false,
                   labels::Vector{<:AbstractString}=String[],
                   api::DataLayerAPI=dlapi,
                   uid::Int=-1,
@@ -226,7 +229,7 @@ function addNode!(fg::FactorGraph,
   addNewVarVertInGraph!(fg, vert, currid, lbl, ready, smalldata)
   # dlapi.setupvertgraph!(fg, vert, currid, lbl) #fg.v[currid]
   # dodims = fg.dimID+1
-  setDefaultNodeData!(vert, zeros(softtype.dims,N), zeros(0,0), 0, N, softtype.dims, initialized=!autoinit, softtype=softtype) # dodims
+  setDefaultNodeData!(vert, zeros(softtype.dims,N), zeros(0,0), 0, N, softtype.dims, initialized=!autoinit, softtype=softtype, dontmargin=dontmargin) # dodims
 
   vnlbls = union(string.(labels), softtype.labels, String["VARIABLE";])
   push!(vnlbls, fg.sessionname)
@@ -253,6 +256,7 @@ function addNode!(fg::FactorGraph,
                   N::Int=100,
                   autoinit::Bool=true,
                   ready::Int=1,
+                  dontmargin::Bool=false,
                   labels::Vector{<:AbstractString}=String[],
                   api::DataLayerAPI=dlapi,
                   uid::Int=-1,
@@ -265,6 +269,7 @@ function addNode!(fg::FactorGraph,
            N=N,
            autoinit=autoinit,
            ready=ready,
+           dontmargin=dontmargin,
            labels=labels,
            api=api,
            uid=uid,
@@ -359,6 +364,8 @@ function parseusermultihypo(multihypo::Union{Tuple,Vector{Float64}})
   return mh
 end
 
+# import IncrementalInference: prepgenericconvolution, convert
+
 function prepgenericconvolution(
             Xi::Vector{Graphs.ExVertex},
             usrfnc::T;
@@ -404,7 +411,7 @@ function setDefaultFactorNode!(
       Xi::Vector{Graphs.ExVertex},
       usrfnc::T;
       multihypo::Union{Void,Tuple,Vector{Float64}}=nothing,
-      threadmodel=MultiThreaded) where {T <: Union{FunctorInferenceType, InferenceType}}
+      threadmodel=SingleThreaded  ) where {T <: Union{FunctorInferenceType, InferenceType}}
   #
   ftyp = typeof(usrfnc) # maybe this can be T
   # @show "setDefaultFactorNode!", usrfnc, ftyp, T
@@ -566,7 +573,7 @@ function addFactor!(fgl::FactorGraph,
       labels::Vector{T}=String[],
       uid::Int=-1,
       autoinit::Bool=true,
-      threadmodel=MultiThreaded,
+      threadmodel=SingleThreaded,
       specialSampling::Bool=false  ) where
         {R <: Union{FunctorInferenceType, InferenceType},
          T <: AbstractString}
@@ -584,6 +591,7 @@ function addFactor!(fgl::FactorGraph,
   setDefaultFactorNode!(fgl, newvert, Xi, deepcopy(usrfnc), multihypo=multihypo, threadmodel=threadmodel)
   push!(fgl.factorIDs,currid)
 
+  # TODO -- evaluate and streamline
   for vert in Xi
     push!(getData(newvert).fncargvID, vert.index)
     # push!(newvert.attributes["data"].fncargvID, vert.index)
@@ -621,7 +629,7 @@ function addFactor!(
       labels::Vector{T}=String[],
       uid::Int=-1,
       autoinit::Bool=true,
-      threadmodel=MultiThreaded,
+      threadmodel=SingleThreaded,
       specialSampling::Bool=false  ) where
         {R <: Union{FunctorInferenceType, InferenceType},
          T <: AbstractString}
@@ -686,7 +694,7 @@ end
 function addBayesNetVerts!(fg::FactorGraph, elimOrder::Array{Int,1})
   for p in elimOrder
     vert = getVert(fg, p, api=localapi)
-    @show vert.label, getData(vert).BayesNetVertID
+    # @show vert.label, getData(vert).BayesNetVertID
     if getData(vert).BayesNetVertID == 0
       fg.bnid+=1
       vert.attributes["data"].BayesNetVertID = p
@@ -848,7 +856,8 @@ end
 function writeGraphPdf(fgl::FactorGraph;
                        viewerapp::String="evince",
                        filepath::AS="/tmp/fg.pdf",
-                       show::Bool=true  ) where {AS <: AbstractString}
+                       engine::AS="sfdp",
+                       show::Bool=true ) where {AS <: AbstractString}
   #
   fgd = drawCopyFG(fgl)
   println("Writing factor graph file")
@@ -858,7 +867,8 @@ function writeGraphPdf(fgl::FactorGraph;
   fid = open(dotfile,"w")
   write(fid,Graphs.to_dot(fgd.g))
   close(fid)
-  show? (@async run(`dot $(dotfile) -T$(fext) -o $(filepath)`)) : nothing
+  show ? (@async run(`$(engine) $(dotfile) -T$(fext) -o $(filepath)`)) : nothing
+
   try
     viewerapp != nothing ? (@async run(`$(viewerapp) $(filepath)`)) : nothing
   catch e

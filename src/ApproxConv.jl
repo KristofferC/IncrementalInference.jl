@@ -117,7 +117,7 @@ function computeAcrossHypothesis!(ccwl::CommonConvWrapper{T},
                                   sfidx) where {T <:Union{FunctorPairwise, FunctorPairwiseMinimize}}
   count = 0
   # TODO remove assert once all GenericWrapParam has been removed
-  @assert norm(ccwl.certainhypo - certainidx) < 1e-6
+  # @assert norm(ccwl.certainhypo - certainidx) < 1e-6
   for (mhidx, vars) in activehypo
     count += 1
     if sfidx in certainidx || mhidx in certainidx || mhidx == sfidx
@@ -335,7 +335,7 @@ function evalFactor2(fgl::FactorGraph,
   end
   return evalPotentialSpecific(Xi, ccw, solvefor, N=N, dbg=dbg)
 end
-
+# import IncrementalInference: evalFactor2, approxConv
 """
     $(SIGNATURES)
 
