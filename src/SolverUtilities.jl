@@ -16,7 +16,8 @@ end
 
 
 function freshSamples!(ccwl::CommonConvWrapper, N::Int=1)
-  if ccwl.specialSampling
+  info("fresh samples $(ccwl.usrfnc!), fields=$(fieldnames(ccwl))")
+  if :specialSampling in fieldnames(ccwl.usrfnc!)
     ccwl.measurement = getSample(ccwl.usrfnc!, ccwl.cpt[Threads.threadid()].factormetadata, N)
   else
     ccwl.measurement = getSample(ccwl.usrfnc!, N)

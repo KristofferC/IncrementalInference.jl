@@ -239,7 +239,6 @@ mutable struct CommonConvWrapper{T} <: ConvolutionObject where {T<:FunctorInfere
   varidx::Int # which index is being solved for in params?
   measurement::Tuple # user defined measurement values for each approxConv operation
   threadmodel::Union{Type{SingleThreaded}, Type{MultiThreaded}}
-  specialSampling::Bool
 
   ### particular convolution computation values per particle idx (varies by thread)
   cpt::Vector{ConvPerThread}
@@ -275,8 +274,7 @@ function CommonConvWrapper(fnc::T,
                            Y=zeros(size(X,1)),
                            xDim=size(X,1),
                            res=zeros(zDim),
-                           threadmodel=MultiThreaded,
-                           specialsampling::Bool=false  ) where {T<:FunctorInferenceType}
+                           threadmodel=MultiThreaded  ) where {T<:FunctorInferenceType}
   #
   ccw = CommonConvWrapper{T}()
 
@@ -291,7 +289,6 @@ function CommonConvWrapper(fnc::T,
   ccw.varidx = varidx
   ccw.threadmodel = threadmodel
   ccw.measurement = measurement
-  ccw.specialSampling = specialsampling
 
   # thread specific elements
   ccw.cpt = Vector{ConvPerThread}(Threads.nthreads())
