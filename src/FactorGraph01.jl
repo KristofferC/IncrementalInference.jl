@@ -383,17 +383,19 @@ function prepgenericconvolution(
     push!(usda.variableuserdata, getData(xi).softtype)
   end
   # TODO -- calculate zDim internal to CCW constructors, as required by specialSampling
-  zdim = 0
-  if typeof(usrfnc) != GenericMarginal
-    zDim = size(getSample(usrfnc, 2)[1],1)
-  elseif usrfnc
+  zDim = 0
+  if :specialSampling in fieldnames(usrfnc)
     zDim = size(getSample(usrfnc, usda, 2)[1],1)
+  elseif typeof(usrfnc) != GenericMarginal
+    zDim = size(getSample(usrfnc, 2)[1],1)
+  elseif !isa(usrfnc, GenericMarginal)
+    error("Unknown getSample strategy for factor: $(usrfnc)")
   end
   certainhypo = multihypo != nothing ? collect(1:length(multihypo.p))[multihypo.p .== 0.0] : collect(1:length(Xi))
   ccw = CommonConvWrapper(
           usrfnc,
           zeros(1,0),
-          zdim,
+          zDim,
           ARR,
           specialzDim = :zDim in fldnms,
           partial = :partial in fldnms,
