@@ -235,9 +235,9 @@ function resetFactorGraphNewTree!(fg::FactorGraph)
   nothing
 end
 
-function wipeBuildNewTree!(fg::FactorGraph; ordering=:qr,drawpdf=false)
+function wipeBuildNewTree!(fg::FactorGraph; ordering=:qr,drawpdf=false, show::Bool=false)
   resetFactorGraphNewTree!(fg);
-  return prepBatchTree!(fg, ordering=ordering, drawpdf=drawpdf);
+  return prepBatchTree!(fg, ordering=ordering, drawpdf=drawpdf,show=show);
 end
 
 function whichCliq{T <: AbstractString}(bt::BayesTree, frt::T)
