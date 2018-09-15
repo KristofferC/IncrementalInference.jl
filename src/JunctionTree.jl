@@ -517,3 +517,21 @@ function buildCliquePotentials(fg::FactorGraph, bt::BayesTree, cliq::Graphs.ExVe
 
     nothing
 end
+
+
+
+function getCliqSymbols(cliq::Graphs.ExVertex)::Tuple{Vector{Symbol},Vector{Symbol}}
+  frnt = Symbol[]
+  sepa = Symbol[]
+  for vert in getVert.(fg, getData(cliq).frontalIDs)
+    push!(frnt, Symbol(vert.label))
+  end
+  for vert in getVert.(fg, getData(cliq).conditIDs)
+    push!(sepa, Symbol(vert.label))
+  end
+  return frnt, sepa
+end
+
+function getCliqSymbols(tree::BayesTree, sym::Symbol)::Tuple{Vector{Symbol},Vector{Symbol}}
+  return getCliqSymbols(whichCliq(tree, sym))
+end
