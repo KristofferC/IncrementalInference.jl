@@ -1,12 +1,6 @@
 import Base: convert
 import Base: ==
 
-abstract type InferenceType end
-abstract type PackedInferenceType end
-
-abstract type FunctorInferenceType <: Function end
-
-abstract type InferenceVariable end
 abstract type ConvolutionObject <: Function end
 
 # been replaced by Functor types, but may be reused for non-numerical cases
@@ -129,44 +123,44 @@ function emptyFactorGraph(;reference::NothingUnion{Dict{Symbol, Tuple{Symbol, Ve
     return fg
 end
 
-mutable struct VariableNodeData
-  initval::Array{Float64,2} # TODO deprecate
-  initstdev::Array{Float64,2} # TODO deprecate
-  val::Array{Float64,2}
-  bw::Array{Float64,2}
-  BayesNetOutVertIDs::Array{Int,1}
-  dimIDs::Array{Int,1} # Likely deprecate
-  dims::Int
-  eliminated::Bool
-  BayesNetVertID::Int
-  separator::Array{Int,1}
-  groundtruth::NothingUnion{ Dict{ Tuple{Symbol, Vector{Float64}} } } # not packed yet
-  softtype
-  initialized::Bool
-  ismargin::Bool
-  dontmargin::Bool
-  VariableNodeData() = new()
-  function VariableNodeData(x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11)
-    @warn "Deprecated use of VariableNodeData(11 param), use 13 parameters instead"
-    new(x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11, nothing, true, false, false) # TODO ensure this is initialized true is working for most cases
-  end
-  VariableNodeData(x1::Array{Float64,2},
-                   x2::Array{Float64,2},
-                   x3::Array{Float64,2},
-                   x4::Array{Float64,2},
-                   x5::Vector{Int},
-                   x6::Vector{Int},
-                   x7::Int,
-                   x8::Bool,
-                   x9::Int,
-                   x10::Vector{Int},
-                   x11::NothingUnion{ Dict{ Tuple{Symbol, Vector{Float64}} } },
-                   x12,
-                   x13::Bool,
-                   x14::Bool,
-                   x15::Bool) =
-    new(x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15)
-end
+# mutable struct VariableNodeData
+#   initval::Array{Float64,2} # TODO deprecate
+#   initstdev::Array{Float64,2} # TODO deprecate
+#   val::Array{Float64,2}
+#   bw::Array{Float64,2}
+#   BayesNetOutVertIDs::Array{Int,1}
+#   dimIDs::Array{Int,1} # Likely deprecate
+#   dims::Int
+#   eliminated::Bool
+#   BayesNetVertID::Int
+#   separator::Array{Int,1}
+#   groundtruth::NothingUnion{ Dict{ Tuple{Symbol, Vector{Float64}} } } # not packed yet
+#   softtype
+#   initialized::Bool
+#   ismargin::Bool
+#   dontmargin::Bool
+#   VariableNodeData() = new()
+#   function VariableNodeData(x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11)
+#     @warn "Deprecated use of VariableNodeData(11 param), use 13 parameters instead"
+#     new(x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11, nothing, true, false, false) # TODO ensure this is initialized true is working for most cases
+#   end
+#   VariableNodeData(x1::Array{Float64,2},
+#                    x2::Array{Float64,2},
+#                    x3::Array{Float64,2},
+#                    x4::Array{Float64,2},
+#                    x5::Vector{Int},
+#                    x6::Vector{Int},
+#                    x7::Int,
+#                    x8::Bool,
+#                    x9::Int,
+#                    x10::Vector{Int},
+#                    x11::NothingUnion{ Dict{ Tuple{Symbol, Vector{Float64}} } },
+#                    x12,
+#                    x13::Bool,
+#                    x14::Bool,
+#                    x15::Bool) =
+#     new(x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15)
+# end
 
 mutable struct FactorMetadata
   factoruserdata
@@ -305,34 +299,6 @@ function CommonConvWrapper(fnc::T,
 
   return ccw
 end
-
-mutable struct GenericFunctionNodeData{T, S}
-  fncargvID::Array{Int,1}
-  eliminated::Bool
-  potentialused::Bool
-  edgeIDs::Array{Int,1}
-  frommodule::S #Union{Symbol, AbstractString}
-  fnc::T
-  multihypo::String # likely to moved when GenericWrapParam is refactored
-  GenericFunctionNodeData{T, S}() where {T, S} = new{T,S}()
-  GenericFunctionNodeData{T, S}(x1, x2, x3, x4, x5::S, x6::T, x7::String="") where {T, S} = new{T,S}(x1, x2, x3, x4, x5, x6, x7)
-  GenericFunctionNodeData(x1, x2, x3, x4, x5::S, x6::T, x7::String="") where {T, S} = new{T,S}(x1, x2, x3, x4, x5, x6, x7)
-  # GenericFunctionNodeData(x1, x2, x3, x4, x5::S, x6::T, x7::String) where {T, S} = new{T,S}(x1, x2, x3, x4, x5, x6, x7)
-end
-
-
-# where {T <: Union{InferenceType, FunctorInferenceType}}
-const FunctionNodeData{T} = GenericFunctionNodeData{T, Symbol}
-FunctionNodeData(x1, x2, x3, x4, x5::Symbol, x6::T, x7::String="") where {T <: Union{FunctorInferenceType, ConvolutionObject}}= GenericFunctionNodeData{T, Symbol}(x1, x2, x3, x4, x5, x6, x7)
-
-# where {T <: PackedInferenceType}
-const PackedFunctionNodeData{T} = GenericFunctionNodeData{T, <: AbstractString}
-PackedFunctionNodeData(x1, x2, x3, x4, x5::S, x6::T, x7::String="") where {T <: PackedInferenceType, S <: AbstractString} = GenericFunctionNodeData(x1, x2, x3, x4, x5, x6, x7)
-
-
-
-
-
 
 ###
 

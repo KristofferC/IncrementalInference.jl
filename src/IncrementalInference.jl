@@ -20,7 +20,8 @@ using
   FileIO,
   ProgressMeter,
   DocStringExtensions,
-  Optim # might be deprecated in favor for only NLsolve dependency
+  Optim, # might be deprecated in favor for only NLsolve dependency
+  DistributedFactorGraphs
 
 
 const KDE = KernelDensityEstimate
