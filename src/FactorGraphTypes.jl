@@ -22,6 +22,12 @@ abstract type FunctorPairwiseMinimize <: FunctorInferenceType end
 abstract type FunctorPairwiseNH <: FunctorPairwise end
 # abstract type FunctorPairwiseNHMinimize <: FunctorPairwiseMinimize end # TODO
 
+"""
+Flag used in factor constructor to indicate that a test factor should be produced.
+"""
+struct FactorTestingFlag
+end
+
 
 const FGG = Graphs.GenericIncidenceList{Graphs.ExVertex,Graphs.Edge{Graphs.ExVertex},Array{Graphs.ExVertex,1},Array{Array{Graphs.Edge{Graphs.ExVertex},1},1}}
 const FGGdict = Graphs.GenericIncidenceList{Graphs.ExVertex,Graphs.Edge{Graphs.ExVertex},Dict{Int,Graphs.ExVertex},Dict{Int,Array{Graphs.Edge{Graphs.ExVertex},1}}}

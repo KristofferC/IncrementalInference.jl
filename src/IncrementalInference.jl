@@ -11,6 +11,7 @@ using Reexport
 @reexport using LinearAlgebra
 
 using
+  Base,
   Statistics,
   Random,
   NLsolve,
@@ -166,6 +167,9 @@ export
   # FunctorPartialSingleton,
   FunctorPairwiseNH,
   FunctorSingletonNH,
+
+  # Flag for testing factor production
+  FactorTestingFlag,
 
   # Solving utils
   findRelatedFromPotential,
