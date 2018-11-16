@@ -2,12 +2,25 @@
 
 SamplableBelief = Union{Distributions.Distribution, KernelDensityEstimate.BallTreeDensity, AliasingScalarSampler}
 
+"""
+Generic packed structure for the JSON factor serializers.
+"""
+mutable struct Packed_Factor
+    measurement::Vector{Dict{String, Any}}
+    distType::String
+end
 
+"""
+One-dimensional scalar variable.
+"""
 struct ContinuousScalar <: InferenceVariable
   dims::Int
   labels::Vector{String}
   ContinuousScalar() = new(1, String[])
 end
+"""
+One-dimensional multivariate variable.
+"""
 struct ContinuousMultivariate <: InferenceVariable
   dims::Int
   labels::Vector{String}
@@ -15,12 +28,32 @@ struct ContinuousMultivariate <: InferenceVariable
   ContinuousMultivariate(x) = new(x, String[])
 end
 
-
+"""
+Unary factor representing a prior absolute measurement.
+"""
 struct Prior{T} <: IncrementalInference.FunctorSingleton where T <: SamplableBelief
   Z::T
 end
+# Testing constructor
+Prior(::Type{FactorTestingFlag}) = Prior( MvNormal(zeros(3), 0.1*Matrix{Float64}(LinearAlgebra.I, 3,3)))
 getSample(s::Prior, N::Int=1) = (reshape(rand(s.Z,N),:,N), )
-
+"""
+Converter: Prior -> Dict{String, Any}
+"""
+function convert(::Type{Dict{String, Any}}, prior::IncrementalInference.Prior)
+    @warn "HERE!"
+    z = convert(Dict{String, Any}, prior.Z)
+    return JSON.parse(JSON.json(Packed_Factor([z], "Prior")))
+end
+"""
+Converter: Dict{String, Any} -> Prior
+"""
+function convert(::Type{Prior}, prior::Dict{String, Any})
+    # Genericize to any packed type next.
+    z = prior["measurement"][1]
+    z = convert(_evalType(z["distType"]), z)
+    return Prior(z)
+end
 
 struct LinearConditional{T} <: IncrementalInference.FunctorPairwise where T <: SamplableBelief
   Z::T

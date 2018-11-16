@@ -20,8 +20,8 @@ using
   FileIO,
   ProgressMeter,
   DocStringExtensions,
-  Optim # might be deprecated in favor for only NLsolve dependency
-
+  Optim, # might be deprecated in favor for only NLsolve dependency
+  JSON
 
 const KDE = KernelDensityEstimate
 
@@ -202,8 +202,9 @@ export
   loadjld,
   landmarks,
 
-  # Temp placeholder for evaluating string types to real types
+  # JSON serialization/deserialization
   _evalType,
+  Packed_Factor,
 
   # For 1D example,
 
@@ -226,10 +227,11 @@ const NothingUnion{T} = Union{Nothing, T}
 
 include("FactorGraphTypes.jl")
 include("AliasScalarSampling.jl")
+include("serialization/DistributionModels.jl")
+include("serialization/SerializingDistributions.jl")
 include("DefaultNodeTypes.jl")
 include("DataLayerAPI.jl")
 include("FactorGraph01.jl")
-include("SerializingDistributions.jl")
 include("DispatchPackedConversions.jl")
 include("FGOSUtils.jl")
 
