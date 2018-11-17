@@ -41,7 +41,6 @@ getSample(s::Prior, N::Int=1) = (reshape(rand(s.Z,N),:,N), )
 Converter: Prior -> Dict{String, Any}
 """
 function convert(::Type{Dict{String, Any}}, prior::IncrementalInference.Prior)
-    @warn "HERE!"
     z = convert(Dict{String, Any}, prior.Z)
     return JSON.parse(JSON.json(Packed_Factor([z], "Prior")))
 end
