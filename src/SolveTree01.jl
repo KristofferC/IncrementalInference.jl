@@ -128,10 +128,11 @@ function packFromLocalPotentials!(fgl::FactorGraph,
       cliq::Graphs.ExVertex,
       vertid::Int,
       N::Int,
-      dbg::Bool=false )
+      dbg::Bool=false,
+      api::DataLayerAPI=localapi  )
   #
   for idfct in cliq.attributes["data"].potentials
-    vert = getVert(fgl, idfct, api=localapi)
+    vert = getVert(fgl, idfct, api=api)
     data = getData(vert)
     # skip partials here, will be caught in packFromLocalPartials!
     if length( findall(data.fncargvID .== vertid) ) >= 1 && !data.fnc.partial
@@ -149,11 +150,12 @@ function packFromLocalPartials!(fgl::FactorGraph,
       cliq::Graphs.ExVertex,
       vertid::Int,
       N::Int,
-      dbg::Bool=false)
+      dbg::Bool=false,
+      api::DataLayerAPI=localapi )
   #
 
   for idfct in cliq.attributes["data"].potentials
-    vert = getVert(fgl, idfct, api=localapi)
+    vert = getVert(fgl, idfct, api=api)
     data = getData(vert)
     if length( findall(data.fncargvID .== vertid) ) >= 1 && data.fnc.partial
       p = findRelatedFromPotential(fgl, vert, vertid, N, dbg)
@@ -176,8 +178,9 @@ end
 
 Multiply different dimensions from partial constraints individually.
 """
-function productpartials!(pGM::Array{Float64,2}, dummy::BallTreeDensity,
-        partials::Dict{Int, Vector{BallTreeDensity}}  )
+function productpartials!(pGM::Array{Float64,2},
+                          dummy::BallTreeDensity,
+                          partials::Dict{Int, Vector{BallTreeDensity}}  )
 
   #
   for (dimnum,pp) in partials
@@ -233,7 +236,8 @@ function productbelief(fg::FactorGraph,
                        dens::Vector{BallTreeDensity},
                        partials::Dict{Int, Vector{BallTreeDensity}},
                        N::Int;
-                       dbg::Bool=false )
+                       dbg::Bool=false,
+                       api::DataLayerAPI=localapi)
   #
 
   pGM = Array{Float64,2}(undef, 0,0)
@@ -247,7 +251,7 @@ function productbelief(fg::FactorGraph,
     @info "[$(lennonp)x$(lenpart)p,d$(Ndims),N$(N)],"
     pGM = prodmultipleonefullpartials(dens, partials, Ndims, N)
   elseif lennonp == 0 && lenpart >= 1
-    denspts = getVal(fg,vertid,api=localapi)
+    denspts = getVal(fg,vertid, api=api)
     Ndims = size(denspts,1)
     @info "[$(lennonp)x$(lenpart)p,d$(Ndims),N$(N)],"
     dummy = kde!(rand(Ndims,N), ones(Ndims)) # [1.0] # TODO -- reuse memory rather than rand here
@@ -420,7 +424,8 @@ function cliqGibbs(fg::FactorGraph,
                    vertid::Int,
                    inmsgs::Array{NBPMessage,1},
                    N::Int,
-                   dbg::Bool  )
+                   dbg::Bool,
+                   api::DataLayerAPI=localapi  )
   #
   # several optimizations can be performed in this function TODO
 
@@ -429,11 +434,11 @@ function cliqGibbs(fg::FactorGraph,
   partials = Dict{Int, Vector{BallTreeDensity}}()
   wfac = Vector{AbstractString}()
   packFromIncomingDensities!(dens, wfac, vertid, inmsgs)
-  packFromLocalPotentials!(fg, dens, wfac, cliq, vertid, N)
+  packFromLocalPotentials!(fg, dens, wfac, cliq, vertid, N, api)
   packFromLocalPartials!(fg, partials, cliq, vertid, N, dbg)
 
-  potprod = !dbg ? nothing : PotProd(vertid, getVal(fg,vertid,api=localapi), Array{Float64}(undef, 0,0), dens, wfac)
-  pGM = productbelief(fg, vertid, dens, partials, N, dbg=dbg )
+  potprod = !dbg ? nothing : PotProd(vertid, getVal(fg,vertid, api=api), Array{Float64}(undef, 0,0), dens, wfac)
+  pGM = productbelief(fg, vertid, dens, partials, N, dbg=dbg, api=api )
   if dbg  potprod.product = pGM  end
 
   # @info " "
@@ -453,7 +458,8 @@ function fmcmc!(fgl::FactorGraph,
                 IDs::Vector{Int},
                 N::Int,
                 MCMCIter::Int,
-                dbg::Bool=false  )
+                dbg::Bool=false,
+                api::DataLayerAPI=dlapi )
   #
     @info "---------- successive fnc approx ------------$(cliq.attributes["label"])"
     # repeat several iterations of functional Gibbs sampling for fixed point convergence
@@ -467,15 +473,15 @@ function fmcmc!(fgl::FactorGraph,
       @info "#$(iter)\t -- "
       dbgvals = !dbg ? nothing : CliqGibbsMC([], Symbol[])
       for vertid in IDs
-        vert = getVert(fgl, vertid, api=dlapi)
+        vert = getVert(fgl, vertid, api=api)
         if !getData(vert).ismargin
           # we'd like to do this more pre-emptive and then just execute -- just point and skip up only msgs
           densPts, potprod = cliqGibbs(fgl, cliq, vertid, fmsgs, N, dbg) #cliqGibbs(fg, cliq, vertid, fmsgs, N)
           if size(densPts,1)>0
-            updvert = getVert(fgl, vertid, api=dlapi)  # TODO --  can we remove this duplicate getVert?
+            updvert = getVert(fgl, vertid, api=api)  # TODO --  can we remove this duplicate getVert?
             setValKDE!(updvert, densPts)
             # Go update the datalayer TODO -- excessive for general case, could use local and update remote at end
-            dlapi.updatevertex!(fgl, updvert)
+            api.updatevertex!(fgl, updvert)
             # fgl.v[vertid].attributes["val"] = densPts
             if dbg
               push!(dbgvals.prods, potprod)
@@ -588,7 +594,11 @@ end
 Perform computations required for the upward message passing during belief propation on the Bayes (Junction) tree.
 This function is usually called as part via remote_call for multiprocess dispatch.
 """
-function upGibbsCliqueDensity(inp::ExploreTreeType, N::Int=200, dbg::Bool=false)
+function upGibbsCliqueDensity(inp::ExploreTreeType,
+                              N::Int=200,
+                              dbg::Bool=false,
+                              api::DataLayerAPI=dlapi  )
+    #
     @info "up w $(length(inp.sendmsgs)) msgs"
     # Local mcmc over belief functions
     # this is so slow! TODO Can be ignored once we have partial working
@@ -600,26 +610,26 @@ function upGibbsCliqueDensity(inp::ExploreTreeType, N::Int=200, dbg::Bool=false)
 
     priorprods = Vector{CliqGibbsMC}()
 
-    cliqdata = inp.cliq.attributes["data"]
+    cliqdata = getData(inp.cliq) #inp.cliq.attributes["data"]
 
     # use nested structure for more fficient Chapman-Kolmogorov solution approximation
     if false
       IDS = [cliqdata.frontalIDs;cliqdata.conditIDs] #inp.cliq.attributes["frontalIDs"]
-      mcmcdbg, d = fmcmc!(inp.fg, inp.cliq, inp.sendmsgs, IDS, N, 3, dbg)
+      mcmcdbg, d = fmcmc!(inp.fg, inp.cliq, inp.sendmsgs, IDS, N, 3, dbg, api)
     else
-      dummy, d = fmcmc!(inp.fg, inp.cliq, inp.sendmsgs, cliqdata.directFrtlMsgIDs, N, 1)
+      dummy, d = fmcmc!(inp.fg, inp.cliq, inp.sendmsgs, cliqdata.directFrtlMsgIDs, N, 1, dbg, api)
       if length(cliqdata.msgskipIDs) > 0
-        dummy, dd = fmcmc!(inp.fg, inp.cliq, inp.sendmsgs, cliqdata.msgskipIDs, N, 1)
+        dummy, dd = fmcmc!(inp.fg, inp.cliq, inp.sendmsgs, cliqdata.msgskipIDs, N, 1, dbg, api)
         for md in dd d[md[1]] = md[2]; end
       end
       # NOTE -- previous mistake, must iterate over directsvarIDs also
       if length(cliqdata.itervarIDs) > 0
-        mcmcdbg, ddd = fmcmc!(inp.fg, inp.cliq, inp.sendmsgs, cliqdata.itervarIDs, N, 3, dbg)
+        mcmcdbg, ddd = fmcmc!(inp.fg, inp.cliq, inp.sendmsgs, cliqdata.itervarIDs, N, 3, dbg, api)
         for md in ddd d[md[1]] = md[2]; end
       end
       if length(cliqdata.directPriorMsgIDs) > 0
         doids = setdiff(cliqdata.directPriorMsgIDs, cliqdata.msgskipIDs)
-        priorprods, dddd = fmcmc!(inp.fg, inp.cliq, inp.sendmsgs, doids, N, 1, dbg)
+        priorprods, dddd = fmcmc!(inp.fg, inp.cliq, inp.sendmsgs, doids, N, 1, dbg, api)
         for md in dddd d[md[1]] = md[2]; end
       end
     end
@@ -727,7 +737,13 @@ end
 
 Update cliq `cliqID` in Bayes (Juction) tree `bt` according to contents of `ddt` -- intended use is to update main clique after a downward belief propagation computation has been completed per clique.
 """
-function updateFGBT!(fg::FactorGraph, bt::BayesTree, cliqID::Int, ddt::DownReturnBPType; dbg::Bool=false, fillcolor::String="")
+function updateFGBT!(fg::FactorGraph,
+                     bt::BayesTree,
+                     cliqID::Int,
+                     ddt::DownReturnBPType;
+                     dbg::Bool=false,
+                     fillcolor::String="",
+                     api::DataLayerAPI=dlapi  )
     # if dlapi.cgEnabled
     #   return nothing
     # end
@@ -742,10 +758,10 @@ function updateFGBT!(fg::FactorGraph, bt::BayesTree, cliqID::Int, ddt::DownRetur
     end
     for dat in ddt.IDvals
       #TODO -- should become an update call
-        updvert = dlapi.getvertex(fg,dat[1])
+        updvert = api.getvertex(fg,dat[1])
         setValKDE!(updvert, deepcopy(dat[2])) # TODO -- not sure if deepcopy is required
         # updvert.attributes["latestEst"] = Statistics.mean(dat[2],2)
-        dlapi.updatevertex!(fg, updvert, updateMAPest=true)
+        api.updatevertex!(fg, updvert, updateMAPest=true)
     end
     nothing
 end
@@ -755,7 +771,13 @@ end
 
 Update cliq `cliqID` in Bayes (Juction) tree `bt` according to contents of `urt` -- intended use is to update main clique after a upward belief propagation computation has been completed per clique.
 """
-function updateFGBT!(fg::FactorGraph, bt::BayesTree, cliqID::Int, urt::UpReturnBPType; dbg::Bool=false, fillcolor::String="")
+function updateFGBT!(fg::FactorGraph,
+                     bt::BayesTree,
+                     cliqID::Int,
+                     urt::UpReturnBPType;
+                     dbg::Bool=false,
+                     fillcolor::String="",
+                     api::DataLayerAPI=dlapi  )
 # TODO -- use Union{} for two types, rather than separate functions
     # if dlapi.cgEnabled
     #   return nothing
@@ -771,9 +793,9 @@ function updateFGBT!(fg::FactorGraph, bt::BayesTree, cliqID::Int, urt::UpReturnB
       cliq.attributes["style"] = "filled"
     end
     for dat in urt.IDvals
-      updvert = dlapi.getvertex(fg,dat[1])
+      updvert = api.getvertex(fg,dat[1])
       setValKDE!(updvert, deepcopy(dat[2])) # (fg.v[dat[1]], ## TODO -- not sure if deepcopy is required
-      dlapi.updatevertex!(fg, updvert, updateMAPest=true)
+      api.updatevertex!(fg, updvert, updateMAPest=true)
     end
     @info "updateFGBT! up -- finished updating $(cliq.attributes["label"])"
     nothing
@@ -978,7 +1000,7 @@ function prepPostOrderUpPassStacks!(bt::BayesTree,
   nothing
 end
 
-# for up message passing
+# for up message passing -- per clique
 function asyncProcessPostStacks!(fgl::FactorGraph,
                                  bt::BayesTree,
                                  chldstk::Vector{Graphs.ExVertex},
@@ -999,6 +1021,8 @@ function asyncProcessPostStacks!(fgl::FactorGraph,
   ur = nothing
   for child in out_neighbors(cliq, bt.bt)
       @info "asyncProcessPostStacks -- $(stkcnt), cliq=$(cliq.attributes["label"]), start on child $(child.attributes["label"]) haskey=$(haskey(child.attributes, "remoteref"))"
+
+        # TODO make use proper conditional wait rather than sleep
         while !haskey(refdict, child.index)
           # info("Sleeping $(cliq.attributes["label"]) on lack of remoteref from $(child.attributes["label"])")
           # @show child.index, keys(refdict)
@@ -1010,7 +1034,8 @@ function asyncProcessPostStacks!(fgl::FactorGraph,
       else
         ur = child.attributes["remoteref"]
       end
-      updateFGBT!( fgl, bt, child.index, ur, dbg=dbg, fillcolor="pink" ) # deep copies happen in the update function
+      updateFGBT!( fgl, bt, child.index, ur, dbg=dbg, api=localapi ) # new
+      updateFGBT!( fgl, bt, child.index, ur, dbg=dbg, fillcolor="pink", api=dlapi ) # deep copies happen in the update function
       drawpdf ? drawTree(bt) : nothing
       #delete!(child.attributes, "remoteref")
 
@@ -1027,7 +1052,7 @@ function asyncProcessPostStacks!(fgl::FactorGraph,
 
   newprocid = upp2()
   if gomulti
-    refdict[cliq.index] = remotecall(upGibbsCliqueDensity, newprocid, pett, N, dbg ) # swap order for Julia 0.5
+    refdict[cliq.index] = remotecall( upGibbsCliqueDensity, newprocid, pett, N, dbg, localapi ) # swap order for Julia 0.5
   else
     # bad way to do non multi test
     cliq.attributes["remoteref"] = upGibbsCliqueDensity(pett, N, dbg)
@@ -1065,6 +1090,7 @@ function processPostOrderStacks!(fg::FactorGraph,
   @info "processPostOrderStacks! -- THIS ONLY HAPPENS AFTER SYNC"
   # we still need to fetch the root node computational output
   if true
+    # blocking fetch on Future object
     ur = fetch(refdict[childStack[1].index])
   else
     ur = childStack[1].attributes["remoteref"]
@@ -1074,7 +1100,8 @@ function processPostOrderStacks!(fg::FactorGraph,
 
   @info "upward leftovers, $(keys(refdict))"
 
-  updateFGBT!(fg, bt, childStack[1].index, ur, dbg=dbg, fillcolor="pink" ) # nodedata
+  updateFGBT!(fg, bt, childStack[1].index, ur, dbg=dbg, api=localapi ) # new
+  updateFGBT!(fg, bt, childStack[1].index, ur, dbg=dbg, fillcolor="pink", api=dlapi ) # nodedata
   drawpdf ? drawTree(bt) : nothing
   nothing
 end

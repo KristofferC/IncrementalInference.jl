@@ -314,7 +314,7 @@ function evalFactor2(fgl::FactorGraph,
   variablelist = Vector{Symbol}(undef, length(getData(fct).fncargvID))
   for id in getData(fct).fncargvID
     count += 1
-    xi = getVert(fgl,id)
+    xi = getVert(fgl, id, api=localapi)
     push!(Xi, xi ) # TODO localapi
     # push!(Xi, dlapi.getvertex(fgl,id))
 
